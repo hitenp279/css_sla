@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CertAuth — Dashboard</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="toast"></div>
+
+<div class="dashboard" id="app" style="display:none">
+
+  <div class="dash-header">
+    <div class="dash-logo">CERT<span>AUTH</span></div>
+    <div class="dash-meta">
+      <div id="user-badge"></div>
+      <button class="btn btn-danger" style="width:auto;padding:0.4rem 0.9rem;margin-top:0.4rem;font-size:0.72rem;" onclick="logout()">
+        Logout
+      </button>
+    </div>
+  </div>
+
+  <div class="panel-grid">
+
+    <!-- Issue -->
+    <div class="panel">
+      <div class="panel-title">// Issue Certificate</div>
+      <div class="field">
+        <label>Recipient Name</label>
+        <input id="issueUser" placeholder="e.g. Alice Johnson">
+      </div>
+      <button class="btn btn-primary" onclick="issueCert()">Issue</button>
+      <div id="issueResult" class="result-box" style="display:none">
+        <span class="label">RESULT</span>
+      </div>
+      <div id="privKeyBox" style="display:none;margin-top:0.8rem">
+        <div class="field">
+          <label>⚠️ Private Key — save this, not stored on server</label>
+          <textarea id="privateKey" rows="4" readonly></textarea>
+        </div>
+        <button class="btn btn-secondary" style="font-size:0.72rem;padding:0.5rem" onclick="copyKey()">Copy Key</button>
+      </div>
+    </div>
+
+    <!-- Verify -->
+    <div class="panel">
+      <div class="panel-title">// Verify Certificate</div>
+      <div class="field">
+        <label>Certificate ID</label>
+        <input id="verifyCertId" placeholder="paste cert ID">
+      </div>
+      <button class="btn btn-secondary" onclick="verifyCert()">Verify</button>
+      <div id="verifyResult" class="result-box" style="display:none">
+        <span class="label">STATUS</span>
+      </div>
+    </div>
+
+    <!-- Prove Ownership -->
+    <div class="panel">
+      <div class="panel-title">// Prove Ownership</div>
+      <div class="field">
+        <label>Certificate ID</label>
+        <input id="ownerCertId" placeholder="paste cert ID">
+      </div>
+      <div class="field">
+        <label>Your Private Key (PEM)</label>
+        <textarea id="ownerPrivKey" rows="3" placeholder="-----BEGIN PRIVATE KEY-----"></textarea>
+      </div>
+      <button class="btn btn-secondary" onclick="proveOwnership()">Prove</button>
+      <div id="ownerResult" class="result-box" style="display:none">
+        <span class="label">OWNERSHIP</span>
+      </div>
+    </div>
+
+    <!-- Admin Controls -->
+    <div class="panel" id="adminPanel" style="display:none">
+      <div class="panel-title">// Admin Controls</div>
+      <div class="field">
+        <label>Certificate ID</label>
+        <input id="revokeCertId" placeholder="paste cert ID">
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-danger" onclick="revokeCert()">Revoke</button>
+        <button class="btn btn-warn"   onclick="loadAll()">View All</button>
+      </div>
+      <div id="revokeResult" class="result-box" style="display:none">
+        <span class="label">ADMIN</span>
+      </div>
+    </div>
+
+    <!-- All Certs Table -->
+    <div class="panel panel-full" id="allCertsPanel" style="display:none">
+      <div class="panel-title">// All Certificates</div>
+      <div id="allCertsTable"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const role     = localStorage.getItem('role');
+  const username = localStorage.getItem('username') || 'user';
+  const token    = localStorage.getItem('token');
+
+  if (!token) window.location.href = 'login.html';
+
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('user-badge').innerHTML =
+    `<span style="color:var(--muted);font-size:0.72rem">${username}</span> ` +
+    `<span class="badge ${role === 'admin' ? 'badge-valid' : 'badge-expired'}" style="margin-left:6px">${role?.toUpperCase()}</span>`;
+
+  if (role === 'admin') document.getElementById('adminPanel').style.display = 'block';
+
+  const API = 'http://localhost:3000/api';
+
+  function toast(msg, type = 'info') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `show ${type}`;
+    setTimeout(() => el.className = '', 3500);
+  }
+
+  function showResult(id, content, state = '') {
+    const el = document.getElementById(id);
+    el.style.display = 'block';
+    el.innerHTML = `<span class="label">RESULT</span>${content}`;
+    el.className = 'result-box' + (state ? ` ${state}` : '');
+  }
+
+  function setLoading(fnName, loading) {
+    const btn = document.querySelector(`button[onclick="${fnName}()"]`);
+    if (!btn) return;
+    if (loading) { btn._orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = 'Working...'; }
+    else         { btn.disabled = false; btn.innerHTML = btn._orig; }
+  }
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = 'login.html';
+  }
+
+  function copyKey() {
+    navigator.clipboard.writeText(document.getElementById('privateKey').value)
+      .then(() => toast('Private key copied', 'success'));
+  }
+
+  async function issueCert() {
+    const user = document.getElementById('issueUser').value.trim();
+    if (!user) return toast('Enter a recipient name', 'error');
+    setLoading('issueCert', true);
+    try {
+      const res  = await fetch(`${API}/issue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user })
+      });
+      const data = await res.json();
+      if (data.certId) {
+        showResult('issueResult', `Cert ID: ${data.certId}\nIssued to: ${user}`, 'valid');
+        document.getElementById('privKeyBox').style.display = 'block';
+        document.getElementById('privateKey').value = data.privateKey;
+        toast('Certificate issued', 'success');
+      } else {
+        showResult('issueResult', data.error || 'Failed', 'invalid');
+      }
+    } catch { showResult('issueResult', 'Network error', 'invalid'); }
+    setLoading('issueCert', false);
+  }
+
+  async function verifyCert() {
+    const certId = document.getElementById('verifyCertId').value.trim();
+    if (!certId) return toast('Enter a Certificate ID', 'error');
+    setLoading('verifyCert', true);
+    try {
+      const res  = await fetch(`${API}/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ certId })
+      });
+      const data = await res.json();
+      const isValid   = data.status?.includes('VALID') && !data.status?.includes('NOT');
+      const isRevoked = data.status?.includes('REVOKED');
+      showResult('verifyResult', data.status, isValid ? 'valid' : isRevoked ? 'invalid' : 'warning');
+    } catch { showResult('verifyResult', 'Network error', 'invalid'); }
+    setLoading('verifyCert', false);
+  }
+
+  async function proveOwnership() {
+    const certId  = document.getElementById('ownerCertId').value.trim();
+    const privKey = document.getElementById('ownerPrivKey').value.trim();
+    if (!certId)  return toast('Enter Certificate ID', 'error');
+    if (!privKey) return toast('Paste your private key', 'error');
+    setLoading('proveOwnership', true);
+    try {
+      const c = await fetch(`${API}/challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ certId })
+      });
+      const { challenge } = await c.json();
+
+      let signedHex;
+      try { signedHex = await signWithKey(privKey, challenge); }
+      catch (e) {
+        showResult('ownerResult', `Signing failed: ${e.message}`, 'invalid');
+        setLoading('proveOwnership', false);
+        return;
+      }
+
+      const res  = await fetch(`${API}/validate-challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ certId, signedChallenge: signedHex })
+      });
+      const data = await res.json();
+      showResult('ownerResult', data.result, data.result?.includes('AUTHENTIC') ? 'valid' : 'invalid');
+    } catch { showResult('ownerResult', 'Network error', 'invalid'); }
+    setLoading('proveOwnership', false);
+  }
+
+  async function signWithKey(pemKey, challenge) {
+    const b64 = pemKey
+      .replace(/-----BEGIN [^-]+-----/, '')
+      .replace(/-----END [^-]+-----/, '')
+      .replace(/\s+/g, '');
+    const buffer = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const key = await crypto.subtle.importKey(
+      'pkcs8', buffer.buffer,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false, ['sign']
+    );
+    const sig = await crypto.subtle.sign(
+      'RSASSA-PKCS1-v1_5', key,
+      new TextEncoder().encode(challenge)
+    );
+    return Array.from(new Uint8Array(sig))
+      .map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function revokeCert() {
+    const certId = document.getElementById('revokeCertId').value.trim();
+    if (!certId) return toast('Enter a Certificate ID', 'error');
+    if (!confirm(`Revoke certificate ${certId}?`)) return;
+    try {
+      const res  = await fetch(`${API}/revoke`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ certId })
+      });
+      const data = await res.json();
+      showResult('revokeResult', data.message || 'Revoked', 'invalid');
+      toast('Certificate revoked', 'info');
+    } catch { showResult('revokeResult', 'Network error', 'invalid'); }
+  }
+
+  async function loadAll() {
+    try {
+      const res  = await fetch(`${API}/all`);
+      const data = await res.json();
+      if (!data || !Object.keys(data).length) {
+        document.getElementById('allCertsPanel').style.display = 'block';
+        document.getElementById('allCertsTable').textContent = 'No certificates found.';
+        return;
+      }
+      const rows = Object.entries(data).map(([id, cert]) => {
+        const expired = Date.now() > cert.validUntil;
+        const status  = cert.status === 'revoked' ? 'revoked' : (expired ? 'expired' : 'valid');
+        return `<tr>
+          <td style="color:var(--accent)">${id}</td>
+          <td>${cert.user || '—'}</td>
+          <td><span class="badge badge-${status}">${status}</span></td>
+          <td>${new Date(cert.issuedAt).toLocaleDateString()}</td>
+          <td>${new Date(cert.validUntil).toLocaleDateString()}</td>
+        </tr>`;
+      }).join('');
+      document.getElementById('allCertsPanel').style.display = 'block';
+      document.getElementById('allCertsTable').innerHTML = `
+        <table class="cert-table">
+          <thead><tr>
+            <th>Cert ID</th><th>Issued To</th><th>Status</th><th>Issued</th><th>Expires</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    } catch { toast('Failed to load certificates', 'error'); }
+  }
+</script>
+</body>
+</html>

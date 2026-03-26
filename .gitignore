@@ -1,0 +1,63 @@
+# ======================
+# Node.js
+# ======================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# ======================
+# Environment variables
+# ======================
+.env
+
+# ======================
+# Firebase (VERY IMPORTANT 🔐)
+# ======================
+backend/firebaseKey.json
+
+# ======================
+# Logs
+# ======================
+logs/
+*.log
+
+# ======================
+# OS files
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# VS Code
+# ======================
+.vscode/
+
+# ======================
+# Build / temp
+# ======================
+dist/
+build/
+tmp/
+temp/
+
+# ======================
+# Python (you accidentally added this earlier 💀)
+# ======================
+cyber_sec/
+__pycache__/
+*.pyc
+
+# ======================
+# Archives
+# ======================
+*.zip
+*.tar
+*.gz
+
+# ======================
+# Misc
+# ======================
+*.swp
+*.swo

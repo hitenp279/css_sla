@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CertAuth — Register</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div id="toast"></div>
+
+<div class="page-wrapper">
+  <div class="card">
+    <div class="card-header">
+      <div class="logo">CERT<span>AUTH</span></div>
+      <p>Create your account</p>
+    </div>
+
+    <div class="field">
+      <label>Username</label>
+      <input id="username" type="text" placeholder="min 3 characters" autocomplete="username">
+    </div>
+
+    <div class="field">
+      <label>Password</label>
+      <input id="password" type="password" placeholder="min 6 characters" autocomplete="new-password">
+    </div>
+
+    <div class="field">
+      <label>Account Role</label>
+      <select id="role" onchange="toggleAdminField()">
+        <option value="user">User</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+
+    <div class="field" id="adminTokenField" style="display:none">
+      <label>Admin Token (required)</label>
+      <input id="adminToken" type="password" placeholder="paste your session token">
+      <small style="color:var(--muted);font-size:0.68rem;margin-top:5px;display:block;line-height:1.5">
+        Must be logged in as an admin. Your token is in localStorage under "token".
+      </small>
+    </div>
+
+    <button class="btn btn-primary" id="regBtn" onclick="register()">Create Account</button>
+
+    <div class="switch-text">
+      Already registered? <a href="../login.html">Login</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  function toast(msg, type = 'info') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `show ${type}`;
+    setTimeout(() => el.className = '', 3500);
+  }
+
+  function toggleAdminField() {
+    const isAdmin = document.getElementById('role').value === 'admin';
+    document.getElementById('adminTokenField').style.display = isAdmin ? 'block' : 'none';
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') register(); });
+
+  async function register() {
+    const username   = document.getElementById('username').value.trim();
+    const password   = document.getElementById('password').value;
+    const role       = document.getElementById('role').value;
+    const adminToken = document.getElementById('adminToken').value.trim();
+    const btn        = document.getElementById('regBtn');
+
+    if (!username || username.length < 3) return toast('Username must be ≥3 characters', 'error');
+    if (!password || password.length < 6) return toast('Password must be ≥6 characters', 'error');
+    if (role === 'admin' && !adminToken)  return toast('Admin token required', 'error');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Registering...';
+
+    try {
+      const body = { username, password, role };
+      if (role === 'admin') body.adminToken = adminToken;
+
+      const res  = await fetch('http://localhost:3000/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        toast('Account created! Redirecting...', 'success');
+        setTimeout(() => window.location.href = '../login.html', 1200);
+      } else {
+        toast(data.message || 'Registration failed', 'error');
+        btn.disabled = false;
+        btn.innerHTML = 'Create Account';
+      }
+    } catch {
+      toast('Cannot connect to server', 'error');
+      btn.disabled = false;
+      btn.innerHTML = 'Create Account';
+    }
+  }
+</script>
+</body>
+</html>
