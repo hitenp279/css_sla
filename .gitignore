@@ -13,7 +13,7 @@ package-lock.json
 .env
 
 # ======================
-# Firebase (VERY IMPORTANT 🔐)
+# Firebase
 # ======================
 backend/firebaseKey.json
 
@@ -43,7 +43,7 @@ tmp/
 temp/
 
 # ======================
-# Python (you accidentally added this earlier 💀)
+# Python
 # ======================
 cyber_sec/
 __pycache__/
