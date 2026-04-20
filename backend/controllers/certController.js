@@ -5,6 +5,10 @@ const crypto = require("crypto");
 const { publicKey: caPublicKey, privateKey: caPrivateKey } =
   crypto.generateKeyPairSync("rsa", { modulusLength: 2048 });
 
+console.log(
+  caPublicKey.export({ type: "spki", format: "pem" })
+);
+
 // Challenge store { certId: { challenge, expiresAt } }
 const challenges = {};
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
